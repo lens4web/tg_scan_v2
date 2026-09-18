@@ -1,0 +1,75 @@
+{
+  "system": {
+    "session_name": "my_account",
+    "api_id": 29553756,
+    "api_hash": "752adfaf32eb7dedcadbded199107af2",
+    "notify_id": -1003461397093
+  },
+  "global_stop_words": [
+    "обучение бесплатно"
+  ],
+  "folders": [
+    {
+      "folder_name": "AdB",
+      "keywords": [
+        "кушетка",
+        "массажный стол",
+        "даром"
+      ],
+      "stop_words": []
+    },
+    {
+      "folder_name": "fitness",
+      "notify_id": -1003461397093,
+      "keywords": [
+        "zumba",
+        "зумба",
+        "пилатес",
+        "здоровая спина",
+        "pilates",
+        "fitness",
+        "фитнес"
+      ],
+      "stop_words": []
+    }
+  ]
+}
+
+
+
+
+
+
+
+
+
+
+
+{
+  "system": {
+    "session_name": "my_account",
+    "api_id": 29553756,
+    "api_hash": "752adfaf32eb7dedcadbded199107af2",
+    "notify_id": -1003461397093
+  },
+  "global_stop_words": [
+    "обучение бесплатно"
+  ],
+  "folders": [
+    {
+      "folder_name": "flat",
+      "keywords": [
+        "400",
+        "450",
+        "390",
+        "410",
+        "420",
+        "430",
+        "440",
+        "460",
+        "470"
+      ],
+      "stop_words": ["студия", "студию", "студио", "карма", "посуточно", "1400$", "1450$", "Sale", "Кетеван"]
+    }
+  ]
+}
