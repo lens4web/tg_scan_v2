@@ -14,18 +14,24 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
-# --- Auth Middleware ---
-@dp.message()
-async def auth_middleware(message: types.Message, handler):
-    if message.from_user.id != ADMIN_ID:
-        return
-    return await handler(message)
+from aiogram import BaseMiddleware
 
-@dp.callback_query()
-async def auth_cb_middleware(callback: CallbackQuery, handler):
-    if callback.from_user.id != ADMIN_ID:
-        return
-    return await handler(callback)
+# --- Auth Middleware ---
+class AuthMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        user_id = None
+        if isinstance(event, types.Message):
+            user_id = event.from_user.id
+        elif isinstance(event, types.CallbackQuery):
+            user_id = event.from_user.id
+            
+        if user_id != ADMIN_ID:
+            return
+            
+        return await handler(event, data)
+
+dp.message.middleware(AuthMiddleware())
+dp.callback_query.middleware(AuthMiddleware())
 
 # --- FSM States ---
 class AddUserState(StatesGroup):
