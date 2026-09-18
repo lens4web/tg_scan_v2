@@ -61,6 +61,10 @@ class DelStopWordState(StatesGroup):
     wait_folder_id = State()
     wait_stop_word = State()
 
+class ChangeNotifyState(StatesGroup):
+    wait_user_id = State()
+    wait_notify_id = State()
+
 # Temp storage for pyrogram auth
 auth_temp = {}
 
@@ -75,6 +79,7 @@ def main_menu_kb():
 def user_menu_kb(user_id: int):
     kb = [
         [InlineKeyboardButton(text="📁 Папки", callback_data=f"user_folders:{user_id}")],
+        [InlineKeyboardButton(text="📢 Назначить чат для уведомлений", callback_data=f"change_notify:{user_id}")],
         [InlineKeyboardButton(text="🔄 Перезапустить сканер", callback_data=f"user_restart:{user_id}")],
         [InlineKeyboardButton(text="🗑 Удалить аккаунт", callback_data=f"user_delete:{user_id}")],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu")]
@@ -211,6 +216,46 @@ async def cb_user_menu(callback: CallbackQuery):
         return
         
     await callback.message.edit_text(f"Аккаунт: **{user['phone']}**", reply_markup=user_menu_kb(user_id))
+
+@dp.callback_query(F.data.startswith("change_notify:"))
+async def cb_change_notify(callback: CallbackQuery, state: FSMContext):
+    user_id = int(callback.data.split(":")[1])
+    await state.update_data(user_id=user_id, msg_id=callback.message.message_id)
+    await clean_edit(callback.message, state, "Отправьте ID чата (например, -100123456789), куда вы хотите получать уведомления.
+Или просто перешлите сюда любое сообщение из этого чата:")
+    await state.set_state(ChangeNotifyState.wait_notify_id)
+
+@dp.message(ChangeNotifyState.wait_notify_id)
+async def state_change_notify(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    user_id = data['user_id']
+    
+    notify_id = None
+    if message.forward_origin:
+        if hasattr(message.forward_origin, 'chat'):
+            notify_id = message.forward_origin.chat.id
+        elif hasattr(message.forward_origin, 'sender_user'):
+            notify_id = message.forward_origin.sender_user.id
+            
+    if not notify_id:
+        try:
+            notify_id = int(message.text.strip())
+        except:
+            pass
+            
+    if not notify_id:
+        await clean_edit(message, state, "Не удалось определить ID чата. Попробуйте еще раз или нажмите Назад.", reply_markup=main_menu_kb())
+        await state.clear()
+        return
+        
+    async with aiosqlite.connect(database.DB_PATH) as db:
+        await db.execute("UPDATE users SET notify_id = ? WHERE id = ?", (notify_id, user_id))
+        await db.commit()
+        
+    await clean_edit(message, state, f"✅ Чат уведомлений изменен на: {notify_id}", reply_markup=main_menu_kb())
+    await state.clear()
+    
+    await scanner.reload_user(user_id)
 
 @dp.callback_query(F.data.startswith("user_restart:"))
 async def cb_user_restart(callback: CallbackQuery):
