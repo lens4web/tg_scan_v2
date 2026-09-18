@@ -17,19 +17,14 @@ async def migrate():
     await database.init_db()
     
     with open(OLD_JSON_PATH, "r", encoding="utf-8") as f:
-        # Load the LAST JSON object if there are multiple in the file 
-        # (the file seems to have multiple JSON objects appended, we take the last valid one or parse cleanly)
+        import re
         content = f.read()
         try:
-            # The user's words.json had two objects. We can try to wrap it in an array
-            # or just take the last block.
-            blocks = content.split("}\n{")
-            if len(blocks) > 1:
-                # Reconstruct the last block
-                last_block = "{" + blocks[-1]
-                data = json.loads(last_block)
-            else:
-                data = json.loads(content)
+            # Превращаем несколько JSON объектов в валидный массив
+            content_fixed = re.sub(r'\}\s*\{', '},{', content)
+            content_fixed = f"[{content_fixed}]"
+            data_list = json.loads(content_fixed)
+            data = data_list[-1]  # Берем последний сохраненный конфиг
         except Exception as e:
             print(f"Ошибка парсинга JSON: {e}")
             return
