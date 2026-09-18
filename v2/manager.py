@@ -49,6 +49,18 @@ class AddKeywordState(StatesGroup):
     wait_folder_id = State()
     wait_keyword = State()
 
+class DelKeywordState(StatesGroup):
+    wait_folder_id = State()
+    wait_keyword = State()
+
+class AddStopWordState(StatesGroup):
+    wait_folder_id = State()
+    wait_stop_word = State()
+
+class DelStopWordState(StatesGroup):
+    wait_folder_id = State()
+    wait_stop_word = State()
+
 # Temp storage for pyrogram auth
 auth_temp = {}
 
@@ -250,7 +262,10 @@ async def cb_folder_view(callback: CallbackQuery):
     text += "**Стоп-слова:**\n" + (", ".join(stops) if stops else "Нет")
     
     kb = [
-        [InlineKeyboardButton(text="➕ Добавить ключи", callback_data=f"add_kw:{folder_id}")],
+        [InlineKeyboardButton(text="➕ Добавить ключи", callback_data=f"add_kw:{folder_id}"),
+         InlineKeyboardButton(text="➖ Удалить ключ", callback_data=f"del_kw:{folder_id}")],
+        [InlineKeyboardButton(text="➕ Добавить стоп-слово", callback_data=f"add_sw:{folder_id}"),
+         InlineKeyboardButton(text="➖ Удалить стоп-слово", callback_data=f"del_sw:{folder_id}")],
         [InlineKeyboardButton(text="❌ Удалить папку", callback_data=f"del_folder:{folder_id}")],
         [InlineKeyboardButton(text="🔙 В главное меню", callback_data="main_menu")]
     ]
@@ -283,7 +298,74 @@ async def state_add_kw(message: types.Message, state: FSMContext):
         if row:
             await scanner.reload_user(row[0])
 
+
+@dp.callback_query(F.data.startswith("del_kw:"))
+async def cb_del_kw(callback: CallbackQuery, state: FSMContext):
+    folder_id = int(callback.data.split(":")[1])
+    await state.update_data(folder_id=folder_id)
+    await callback.message.answer("Введите ключевое слово для удаления (точно как в списке):")
+    await state.set_state(DelKeywordState.wait_keyword)
+
+@dp.message(DelKeywordState.wait_keyword)
+async def state_del_kw(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    folder_id = data['folder_id']
+    await database.delete_keyword(folder_id, message.text.strip())
+    await state.clear()
+    await message.answer("Удалено! Настройки обновятся автоматически.")
+    
+    async with aiosqlite.connect(database.DB_PATH) as db:
+        cursor = await db.execute("SELECT user_id FROM folders WHERE id = ?", (folder_id,))
+        row = await cursor.fetchone()
+        if row:
+            await scanner.reload_user(row[0])
+
+@dp.callback_query(F.data.startswith("add_sw:"))
+async def cb_add_sw(callback: CallbackQuery, state: FSMContext):
+    folder_id = int(callback.data.split(":")[1])
+    await state.update_data(folder_id=folder_id)
+    await callback.message.answer("Введите стоп-слова через запятую:")
+    await state.set_state(AddStopWordState.wait_stop_word)
+
+@dp.message(AddStopWordState.wait_stop_word)
+async def state_add_sw(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    folder_id = data['folder_id']
+    words = [w.strip() for w in message.text.split(",") if w.strip()]
+    for w in words:
+        await database.add_stop_word(folder_id, w)
+    await state.clear()
+    await message.answer("Стоп-слова добавлены! Настройки обновятся автоматически.")
+    
+    async with aiosqlite.connect(database.DB_PATH) as db:
+        cursor = await db.execute("SELECT user_id FROM folders WHERE id = ?", (folder_id,))
+        row = await cursor.fetchone()
+        if row:
+            await scanner.reload_user(row[0])
+
+@dp.callback_query(F.data.startswith("del_sw:"))
+async def cb_del_sw(callback: CallbackQuery, state: FSMContext):
+    folder_id = int(callback.data.split(":")[1])
+    await state.update_data(folder_id=folder_id)
+    await callback.message.answer("Введите стоп-слово для удаления (точно как в списке):")
+    await state.set_state(DelStopWordState.wait_stop_word)
+
+@dp.message(DelStopWordState.wait_stop_word)
+async def state_del_sw(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    folder_id = data['folder_id']
+    await database.delete_stop_word(folder_id, message.text.strip())
+    await state.clear()
+    await message.answer("Удалено! Настройки обновятся автоматически.")
+    
+    async with aiosqlite.connect(database.DB_PATH) as db:
+        cursor = await db.execute("SELECT user_id FROM folders WHERE id = ?", (folder_id,))
+        row = await cursor.fetchone()
+        if row:
+            await scanner.reload_user(row[0])
+
 @dp.callback_query(F.data.startswith("del_folder:"))
+
 async def cb_del_folder(callback: CallbackQuery):
     folder_id = int(callback.data.split(":")[1])
     
