@@ -221,8 +221,7 @@ async def cb_user_menu(callback: CallbackQuery):
 async def cb_change_notify(callback: CallbackQuery, state: FSMContext):
     user_id = int(callback.data.split(":")[1])
     await state.update_data(user_id=user_id, msg_id=callback.message.message_id)
-    await clean_edit(callback.message, state, "Отправьте ID чата (например, -100123456789), куда вы хотите получать уведомления.
-Или просто перешлите сюда любое сообщение из этого чата:")
+    await clean_edit(callback.message, state, "Отправьте ID чата (например, -100123456789), куда вы хотите получать уведомления.\\nИли просто перешлите сюда любое сообщение из этого чата:")
     await state.set_state(ChangeNotifyState.wait_notify_id)
 
 @dp.message(ChangeNotifyState.wait_notify_id)
