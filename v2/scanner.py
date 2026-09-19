@@ -26,6 +26,7 @@ user_configs = {}
 
 # Last notified content per user to avoid duplicates
 last_notified = {}
+last_checked_ids = {} # chat_id -> message.id
 
 async def load_user_config(user_id: int):
     """Loads a specific user's config from the DB into memory."""
@@ -99,7 +100,7 @@ async def sync_folder_chats(user_id: int, app: Client):
     except Exception as e:
         print(f"[{user_id}] Error syncing folders: {e}")
 
-async def handle_message(client: Client, message, user_id: int):
+async def handle_message(client: Client, message, user_id: int, from_poller=False):
     """The main event handler for incoming messages."""
     if user_id not in user_configs:
         return
@@ -111,7 +112,10 @@ async def handle_message(client: Client, message, user_id: int):
     if not content:
         return
         
+
     chat_id = message.chat.id
+    if message.id > last_checked_ids.get(chat_id, 0):
+        last_checked_ids[chat_id] = message.id
     cfg = user_configs[user_id]
     
     current_content_strip = content.strip()
@@ -141,7 +145,6 @@ async def handle_message(client: Client, message, user_id: int):
     if not matched_folder_name:
         return # Not in any monitored folder
         
-    print(f"[{user_id}] Message received in monitored folder '{matched_folder_name}' (chat {chat_id})")
     
     # Local stop words check
     if any(sw in text_lower for sw in folder_data["stop_words"]):
@@ -188,6 +191,49 @@ def get_message_handler(user_id: int):
         await handle_message(client, message, user_id)
     return wrapper
 
+
+
+async def poller_task(user_id: int):
+    client = running_clients.get(user_id)
+    if not client: return
+    
+    print(f"[{user_id}] Poller background task started.")
+    while user_id in running_clients:
+        try:
+            cfg = user_configs.get(user_id)
+            if not cfg:
+                await asyncio.sleep(5)
+                continue
+                
+            for f_name, f_data in cfg["folders"].items():
+                for chat_id in f_data["chats"]:
+                    if user_id not in running_clients:
+                        break
+                        
+                    last_id = last_checked_ids.get(chat_id, 0)
+                    try:
+                        new_messages = []
+                        async for message in client.get_chat_history(chat_id, limit=10):
+                            if last_id != 0 and message.id <= last_id:
+                                break
+                            new_messages.append(message)
+                            
+                        for message in reversed(new_messages):
+                            if message.id > last_checked_ids.get(chat_id, 0):
+                                last_checked_ids[chat_id] = message.id
+                            
+                            # Force pass it to handle_message
+                            # It will safely ignore non-matching or duplicate contents
+                            await handle_message(client, message, user_id, from_poller=True)
+                            
+                        await asyncio.sleep(0.1) # Small delay to avoid flooding API
+                    except Exception as e:
+                        pass # Chat might be deleted or inaccessible
+                        
+            await asyncio.sleep(10) # Wait 10 seconds before next full cycle
+        except Exception as e:
+            print(f"[{user_id}] Poller error: {e}")
+            await asyncio.sleep(10)
 
 async def start_client(user: dict):
     user_id = user["id"]
@@ -243,6 +289,7 @@ async def start_client(user: dict):
         except Exception as e:
             print(f"[{user_id}] Failed to send startup report: {e}")
 
+    asyncio.create_task(poller_task(user_id))
     print(f"[{user_id}] Client started and monitoring.")
     return True
 
