@@ -141,6 +141,8 @@ async def handle_message(client: Client, message, user_id: int):
     if not matched_folder_name:
         return # Not in any monitored folder
         
+    print(f"[{user_id}] Message received in monitored folder '{matched_folder_name}' (chat {chat_id})")
+    
     # Local stop words check
     if any(sw in text_lower for sw in folder_data["stop_words"]):
         return
@@ -153,13 +155,15 @@ async def handle_message(client: Client, message, user_id: int):
             break
             
     if found_match:
+        print(f"[{user_id}] MATCH FOUND: {found_match}")
         last_notified[user_id] = current_content_strip
         
-        author_info = "📢 Channel/Admin"
         if message.from_user:
-            u = message.from_user
-            user_name = f"{u.first_name or ''} {u.last_name or ''}".strip()
-            author_info = f"👤 {user_name} (@{u.username})" if u.username else f"👤 {user_name}"
+            user = message.from_user
+            user_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+            author_info = f"👤 {user_name} (@{user.username})" if user.username else f"👤 {user_name}"
+        else:
+            author_info = "📢 Channel/Admin"
             
         link = f"https://t.me/c/{str(chat_id).replace('-100', '')}/{message.id}"
         if message.chat and message.chat.username:
