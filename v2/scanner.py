@@ -219,6 +219,26 @@ async def start_client(user: dict):
     app.add_handler(handler)
     
     running_clients[user_id] = app
+    
+    cfg = user_configs.get(user_id)
+    if cfg:
+        total_folders = len(cfg["folders"])
+        total_chats = sum(len(f["chats"]) for f in cfg["folders"].values())
+        total_kws = sum(len(f["keywords"]) for f in cfg["folders"].values())
+        
+        report_text = (
+            f"🚀 **Сканер запущен!**\n"
+            f"📱 Аккаунт: {user['phone']}\n"
+            f"📁 Активных папок: {total_folders}\n"
+            f"💬 Отслеживаемых чатов: {total_chats}\n"
+            f"🔑 Ключевых слов (сумма): {total_kws}\n\n"
+            f"Система мониторинга включена."
+        )
+        try:
+            await app.send_message(user["notify_id"], report_text)
+        except Exception as e:
+            print(f"[{user_id}] Failed to send startup report: {e}")
+
     print(f"[{user_id}] Client started and monitoring.")
     return True
 
