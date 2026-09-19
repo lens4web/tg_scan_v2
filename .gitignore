@@ -6,3 +6,6 @@ __pycache__/
 .env
 sessions/
 words.json
+
+main/
+test/
